@@ -13,20 +13,16 @@
 //     You should have received a copy of the GNU General Public License
 // along with this program.If not, see < http://www.gnu.org/licenses/>.
 
-import * as PanelMenu from "resource:///org/gnome/shell/ui/panelMenu.js";
-import * as Main from "resource:///org/gnome/shell/ui/main.js";
+const PanelMenu = imports.ui.panelMenu;
+const PopupMenu = imports.ui.popupMenu;
+const Main = imports.ui.main;
+const { St, Clutter, GObject, Gio, GLib } = imports.gi;
 
-import { Extension } from "resource:///org/gnome/shell/extensions/extension.js";
-
-import St from "gi://St";
-import Clutter from "gi://Clutter";
-import GObject from "gi://GObject";
-import Gio from "gi://Gio";
-import GLib from "gi://GLib";
-
-import SpTrayDbus from "./dbus.js";
-import settingsFields from "./settingsFields.js";
-import constants from "./constants.js";
+const ExtensionUtils = imports.misc.extensionUtils;
+const Me = ExtensionUtils.getCurrentExtension();
+const { SpTrayDbus } = Me.imports.dbus;
+const { settingsFields } = Me.imports.settingsFields;
+const { constants } = Me.imports.constants;
 
 const marqueeTextGenerator = function* (label) {
     const length = this.settings.get_int("marquee-length");
@@ -40,12 +36,11 @@ const marqueeTextGenerator = function* (label) {
     }
 };
 
-const SpTrayButton = GObject.registerClass(
+var SpTrayButton = GObject.registerClass(
     { GTypeName: "SpTrayButton" },
     class SpTrayButton extends PanelMenu.Button {
         _init() {
-            this.extensionObject = Extension.lookupByUUID("sp-tray@sp-tray.esenliyim.github.com");
-            super._init(null, this.extensionObject.metadata.name);
+            super._init(null, Me.metadata.name);
 
             this.ui = new Map();
             this._settingSignals = [];
@@ -60,7 +55,7 @@ const SpTrayButton = GObject.registerClass(
         }
 
         _initSettings() {
-            this.settings = this.extensionObject.getSettings();
+            this.settings = ExtensionUtils.getSettings();
 
             // connect relevant settings to the button so that it can be instantly updated when they're changed
             // store the connected signals in an array for easy disconnection later on
@@ -112,8 +107,7 @@ const SpTrayButton = GObject.registerClass(
             // gotta override the style when the display mode is set to marquee in order to fix the width of the label.
             // If left untouched, the width changes constantly as the text scrolls, because, you know, "i" and "w" don't
             // have the same width and the total width of the string depends on the exact characters in it.
-            // I've found that setting width to <marquee-length>/2 em is something of a sweet spot that provides an
-            // acceptable constant width
+            // I've found that setting width to <marquee-length>/2 em is something of a sweet spot that provides an acceptable constant width
             const style = this.settings.get_int("display-mode")
                 ? `width: ${this.settings.get_int("marquee-length") / 2}em;`
                 : null;
@@ -124,27 +118,11 @@ const SpTrayButton = GObject.registerClass(
             });
         }
 
-        /**
-         * Currently supports 3 builds: 1) native builds where the app icon is where every other app's is 2) Snap packages 3) Flatpak packages
-         * First checks for Snap. If there's no file associated with it, sets the icon to the native build's icon, with the Flatpak icon path
-         * as fallback
-         */
         makeIcon() {
-            const snapFileContents = this.readSnapFile();
-            if (snapFileContents) {
-                // There's a snap build of Spotify installed
-                const gicon = Gio.icon_new_for_string(snapFileContents);
-                return new St.Icon({
-                    gicon,
-                    style_class: "system-status-icon",
-                    y_align: Clutter.ActorAlign.CENTER,
-                });
-            }
-            return new St.Icon({
-                icon_name: "spotify",
-                style_class: "system-status-icon",
-                fallback_icon_name: "com.spotify.Client", // icon name for flatpak, in case it's not a native build
-            });
+            let gicon = Gio.icon_new_for_string(Me.path + "/icons/spotify.png")
+            let icon = new St.Icon({gicon});
+            icon.set_icon_size(20)
+            return icon;
         }
 
         readSnapFile() {
@@ -203,7 +181,9 @@ const SpTrayButton = GObject.registerClass(
         }
 
         _setMarqueeStyle(length) {
-            this.ui.get("label").set_style(`width: ${length / 2}em;`);
+            this.ui
+                .get("label")
+                .set_style(`width: ${length / 2}em;`);
         }
 
         destroy() {
@@ -334,7 +314,7 @@ const SpTrayButton = GObject.registerClass(
         _generateMarqueeText(metadata, shouldRestart) {
             this._pauseMarquee();
             const text = this._createFormattedText(metadata);
-            const marqueeLength = this.settings.get_int("marquee-length");
+            const marqueeLength = this.settings.get_int("marquee-length")
             if (text.length <= marqueeLength) {
                 this.ui.get("label").set_style(null); // let the system automatically decide the width
                 return text;
@@ -453,5 +433,3 @@ const SpTrayButton = GObject.registerClass(
         }
     },
 );
-
-export default SpTrayButton;
