@@ -119,7 +119,14 @@ var SpTrayButton = GObject.registerClass(
         }
 
         makeIcon() {
-            let gicon = Gio.icon_new_for_string(Me.path + "/icons/spotify.png")
+            let settings = new Gio.Settings({ schema: 'org.gnome.desktop.interface' })
+            let gtkTheme = settings.get_string('gtk-theme')
+            let path = '/icons/spotify.png'
+            if (gtkTheme.indexOf('dark') > 0) {
+                path = '/icons/spotify_white.png'
+            }
+
+            let gicon = Gio.icon_new_for_string(Me.path + path)
             let icon = new St.Icon({gicon});
             icon.set_icon_size(20)
             return icon;
